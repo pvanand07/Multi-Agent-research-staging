@@ -1,0 +1,89 @@
+Metadata-Version: 2.1
+Name: streamlit-space
+Version: 0.1.5
+Summary: Spacing component for Streamlit
+Home-page: https://st-space.streamlit.app
+License: MIT
+Author: Yi Zhang
+Author-email: yizhang.dev@gmail.com
+Requires-Python: >=3.7, !=2.7.*, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*, !=3.6.*
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Requires-Dist: streamlit (>=1.14.0,<2.0.0)
+Project-URL: Repository, https://github.com/imyizhang/streamlit-space
+Description-Content-Type: text/markdown
+
+# Streamlit Space
+
+[![Open in Streamlit][share_badge]][share_link] [![GitHub][github_badge]][github_link] [![PyPI][pypi_badge]][pypi_link] 
+
+Add blank lines to your Streamlit app.
+
+
+
+## Installation
+
+```bash
+pip install streamlit-space
+```
+
+
+
+## Quickstart
+
+```python
+import streamlit as st
+from streamlit_space import space
+
+st.title('Streamlit Space')
+space()
+```
+
+
+
+## License
+
+Streamlit Space has an MIT license, as found in the [LICENSE](https://github.com/imyizhang/streamlit-space/blob/main/LICENSE) file.
+
+
+
+## Documentation
+
+### streamlit_space.space
+
+#### `streamlit_space.space(container=None, lines=1)`
+
+Add blank lines to Streamlit app.
+
+**Parameters**:
+
+* **container** (any, optional): The Streamlit container. Defaults to `None`.
+* **lines** (int, optional): The number of blank lines to be added. Defaults to `1`.
+
+
+
+## Contribution
+
+
+
+## Changelog
+
+Version 0.1.0:
+
+* Made spacing component functional
+
+
+
+[share_badge]: https://static.streamlit.io/badges/streamlit_badge_black_white.svg
+[share_link]: https://share.streamlit.io/imyizhang/streamlit-space/main/streamlit_app.py
+
+[github_badge]: https://badgen.net/badge/icon/GitHub?icon=github&color=black&label
+[github_link]: https://github.com/imyizhang/streamlit-space
+
+[pypi_badge]: https://badgen.net/pypi/v/streamlit-space?icon=pypi&color=black&label
+[pypi_link]: https://www.pypi.org/project/streamlit-space

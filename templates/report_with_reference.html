@@ -1,0 +1,97 @@
+<html>
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        padding: 20px;
+        transition: background-color 0.3s, color 0.3s;
+    }
+    .light {
+        background-color: #f0f2f6;
+        color: #262730;
+    }
+    .dark {
+        background-color: #1e1e1e; /* Darker, more subtle black */
+        color: #d6d6d6; /* Soft white for better readability */
+    }
+    .colorful {
+        background-color: #fdf5e6; /* Lighter peach background */
+        color: #3b5998; /* Deep blue text color */
+    }
+    h1, h2, h3 {
+        color: inherit;
+        margin-bottom: 20px;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+        border-radius: 8px;
+    }
+    th, td {
+        padding: 10px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+    th {
+        background-color: #f2f2f2;
+    }
+    tr:nth-child(even) {
+        background-color: #f2f2f2;
+    }
+    .dark th, .dark tr:nth-child(even) {
+        background-color: #333333; /* Dark gray for table headers and even rows */
+    }
+    details {
+        width: 100%;
+        border: 1px solid #ddd;
+        margin-bottom: 10px;
+        background-color: #ffffff;
+        padding: 10px;
+        border-radius: 8px;
+    }
+    .dark details {
+        background-color: #282828; /* Dark gray for details container */
+    }
+    summary {
+        padding: 5px;
+        background-color: #f2f2f2;
+        cursor: pointer;
+    }
+    .dark summary {
+        background-color: #333333; /* Dark gray for summary */
+    }
+    .colorful th, .colorful tr:nth-child(even) {
+        background-color: #ffe4b5; /* Light sandy brown for headers and even rows */
+    }
+    .colorful details {
+        background-color: #fff5ee; /* SeaShell color for a softer look */
+    }
+    .colorful summary {
+        background-color: #ffdab9; /* PeachPuff color for summaries */
+    }
+</style>
+
+  </head>
+<body class="light">
+    <select onchange="changeTheme(this.value)">
+        <option value="light">Light Theme</option>
+        <option value="dark">Dark Theme</option>
+        <option value="colorful">Colorful Theme</option>
+    </select>
+        <div>{{ md_report }}</div>
+    </div>
+    <div id="references">
+        <h2>References</h2>
+        {{ references }}
+    </div>
+    <script>
+        function changeTheme(theme) {
+            document.body.className = theme;
+        }
+    </script>
+</body>
+</html>

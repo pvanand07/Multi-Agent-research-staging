@@ -1,0 +1,3 @@
+[console_scripts]
+jsonfixer = half_json.main:fixjson
+
