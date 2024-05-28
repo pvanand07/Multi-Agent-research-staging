@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 load_dotenv("keys.env")
 
 # Retrieve environment variables
+
 TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
 BRAVE_API_KEY = os.getenv("BRAVE_API_KEY")
 SUPABASE_USER = os.getenv("SUPABASE_USER")
@@ -35,20 +36,6 @@ import nltk
 nltk.download("stopwords")
 nltk.download("punkt")
 
-import tiktoken  # Used to limit tokens
-
-encoding = tiktoken.encoding_for_model(
-    "gpt-3.5-turbo"
-)  # Instead of Llama3 using available option/ replace if found anything better
-
-
-def limit_tokens(input_string, token_limit=8000):
-    """
-    Limit tokens sent to the model
-    """
-    return encoding.decode(encoding.encode(input_string)[:token_limit])
-
-
 from src.helper_functions import (
     together_response,
     write_dataframes_to_excel,
@@ -57,7 +44,9 @@ from src.helper_functions import (
     fetch_and_extract_content,
     search_brave,
     insert_data,
+    limit_tokens,
 )
+from typing import Dict, List, Any
 
 ####--------------------CONSTANTS------------------------------##
 
@@ -86,7 +75,10 @@ sys_prompts = {
 }
 
 
-def generate_topics(user_input):
+def generate_topics(user_input: str) -> Dict[str, Any]:
+    """
+    Create a dictionary of the part (part is the component of main user query) and its subtopics.
+    """
 
     prompt_topics = f"""CREATE A LIST OF 5-10 CONCISE SUBTOPICS TO FOLLOW FOR COMPLETING ###{user_input}###, RETURN A VALID PYTHON LIST"""
     prompt_keywords = f"""EXTRACT KEYWORDS(NOUN) FROM USER INPUT ###{user_input}###, RETURN A VALID PYTHON LIST"""
@@ -94,11 +86,11 @@ def generate_topics(user_input):
     response_topics = together_response(
         prompt_topics, model=llm_default_small, SysPrompt=SysPromptList
     )
-    topics = json_from_text(response_topics)
+    topics = json_from_text(text=response_topics)
 
     user_query_keywords = json_from_text(
         together_response(
-            prompt_keywords, model=llm_default_small, SysPrompt=SysPromptList
+            message=prompt_keywords, model=llm_default_small, SysPrompt=SysPromptList
         )
     )
     st.session_state.user_query_keywords = user_query_keywords
@@ -130,7 +122,10 @@ def generate_topics(user_input):
     return subtopics
 
 
-def generate_missing_topics(user_input):
+def generate_missing_topics(user_input: str) -> Dict[str, Any]:
+    """
+    Create a dictionary similar to the `generate_topics` function, but for missing parts.
+    """
 
     topics = user_input
     user_query_keywords = st.session_state.user_query_keywords
@@ -302,7 +297,7 @@ def topics_interface():
                 )
 
 
-def generate_report(query):
+def generate_report(query: str) -> None:
 
     st.write(f"Creating report for {query}")
     if "html_report_content" not in st.session_state:

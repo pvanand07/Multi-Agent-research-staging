@@ -11,8 +11,12 @@ if "user_id" not in st.session_state:
     st.session_state["user_id"] = str(uuid.uuid4())
 
 
-def insert_data(user_id, user_query, subtopic_query, response, html_report):
-    # Connect to your database
+def insert_data(
+    user_id: str, user_query: str, subtopic_query: str, response: str, html_report: str
+) -> None:
+    """
+    Push the user interaction to the database
+    """
     conn = psycopg2.connect(
         dbname="postgres",
         user=SUPABASE_USER,
@@ -26,8 +30,15 @@ def insert_data(user_id, user_query, subtopic_query, response, html_report):
     VALUES (%s, %s, %s, %s, %s, %s);
     """
     cur.execute(
-        insert_query,
-        (user_id, user_query, subtopic_query, response, html_report, datetime.now()),
+        query=insert_query,
+        vars=(
+            user_id,
+            user_query,
+            subtopic_query,
+            response,
+            html_report,
+            datetime.now(),
+        ),
     )
     conn.commit()
     cur.close()
@@ -56,13 +67,15 @@ from nltk.tokenize import word_tokenize
 from brave import Brave
 from fuzzy_json import loads
 from half_json.core import JSONFixer
-from openai import OpenAI
+from openai import NoneType, OpenAI
 import os
+from typing import Dict, List, Any, Tuple
 from dotenv import load_dotenv
 
 load_dotenv("keys.env")
 
 # Retrieve environment variables
+
 TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
 BRAVE_API_KEY = os.getenv("BRAVE_API_KEY")
 SUPABASE_USER = os.getenv("SUPABASE_USER")
@@ -85,21 +98,25 @@ import tiktoken  # Used to limit tokens
 encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
 
 
-def limit_tokens(input_string, token_limit=7500):
+def limit_tokens(input_string: str, token_limit: int = 8000) -> str:
     """
-    Limit tokens sent to the model
+    Limit number of tokens sent to the model to respect context length of models.
     """
     return encoding.decode(encoding.encode(input_string)[:token_limit])
 
 
 def together_response(
-    message,
-    model="meta-llama/Llama-3-8b-chat-hf",
-    SysPrompt=SysPromptDefault,
-    temperature=0.2,
-    max_tokens=2000,
-    frequency_penalty=0.01,
-):
+    message: str,
+    model: str = "meta-llama/Llama-3-8b-chat-hf",
+    SysPrompt: str = SysPromptDefault,
+    temperature: float = 0.2,
+    max_tokens: int = 2000,
+    frequency_penalty: float = 0.01,
+) -> str:
+    """
+    Make LLM inference for the giving SysPrompt and message.
+    """
+
     client = OpenAI(base_url="https://api.together.xyz/v1", api_key=TOGETHER_API_KEY)
 
     messages = [
@@ -117,9 +134,9 @@ def together_response(
     return response.choices[0].message.content
 
 
-def json_from_text(text):
+def json_from_text(text: str) -> Dict[str, Any]:
     """
-    Extracts JSON from text using regex and fuzzy JSON loading.
+    Extracts and fix JSON from text using regex and fuzzy JSON loading.
     """
     match = re.search(r"\{[\s\S]*\}", text)
     if match:
@@ -135,14 +152,20 @@ def json_from_text(text):
         return loads(fix_json.fix(json_out).line)
 
 
-def remove_stopwords(text):
+def remove_stopwords(text: str) -> str:
+    """
+    Remove all the stopwords ('the','a',...,'in') from the given text.
+    """
     stop_words = set(stopwords.words("english"))
     words = word_tokenize(text)
     filtered_text = [word for word in words if word.lower() not in stop_words]
     return " ".join(filtered_text)
 
 
-def rephrase_content(data_format, content, query):
+def rephrase_content(data_format: str, content: str, query: str) -> str | None:
+    """
+    Repharsing and cleaning the scrapped content in the requested data format with LLM (Llama3-8b).
+    """
     if data_format == "Default":
         return together_response(
             f"return only the factual information regarding the query: {{{query}}} using the scraped context:{{{limit_tokens(content)}}}",
@@ -188,7 +211,7 @@ class Scraper:
         return None
 
 
-def extract_main_content(html):
+def extract_main_content(html: str) -> str:
     if html:
         plain_text = ""
         soup = BeautifulSoup(html, "lxml")
@@ -200,7 +223,10 @@ def extract_main_content(html):
     return ""
 
 
-def process_content(data_format, url, query):
+def process_content(data_format: str, url: str, query: str) -> Tuple[str | None, str]:
+    """
+    Scrape data from the fetched URLs and Repharsing it according to requested user query and data format.
+    """
     scraper = Scraper()
     html_content = scraper.fetch_content(url)
     if html_content:
@@ -217,7 +243,12 @@ def process_content(data_format, url, query):
     return "", url
 
 
-def fetch_and_extract_content(data_format, query, urls, num_refrences=4):
+def fetch_and_extract_content(
+    data_format: str, query: str, urls: List[str], num_refrences: int = 4
+) -> List[Tuple[str | None, str]]:
+    """
+    Asynchronously makeing request to urls and doing further process
+    """
     all_text_with_urls = []
     start_url = 0
     while (len(all_text_with_urls) != num_refrences) and (start_url < len(urls)):
@@ -238,7 +269,10 @@ def fetch_and_extract_content(data_format, query, urls, num_refrences=4):
     return all_text_with_urls
 
 
-def search_brave(query, num_results=5):
+def search_brave(query: str, num_results: int = 5) -> List[str]:
+    """
+    Internet search engine to fetch links related to query.
+    """
 
     brave = Brave(BRAVE_API_KEY)
 
@@ -247,14 +281,15 @@ def search_brave(query, num_results=5):
     return [url.__str__() for url in search_results.urls]
 
 
-def md_to_html(md_text):
+def md_to_html(md_text: str) -> str:
+    "Function to Convert Markdown response to HTML (tables, paragraphs, headings)"
     renderer = mistune.HTMLRenderer()
     markdown_renderer = mistune.Markdown(renderer, plugins=[table])
     html_content = markdown_renderer(md_text)
     return html_content
 
 
-def generate_report_with_reference(full_data):
+def generate_report_with_reference(full_data: List[Dict[str, Any]]) -> str:
     """
     Generate HTML report with references and saves pdf report to "generated_pdf_report.pdf"
     """
@@ -316,16 +351,17 @@ def generate_report_with_reference(full_data):
     return html_report
 
 
-def write_dataframes_to_excel(dataframes_list, filename):
+def write_dataframes_to_excel(
+    dataframes_list: List[pd.DataFrame], filename: str
+) -> None:
     """
-    input: [df_list1, df_list2, ..]
-    saves filename.xlsx
+    Save pandas dataframes as excels
     """
     try:
         with pd.ExcelWriter(filename, engine="openpyxl") as writer:
             for idx, dataframes in enumerate(dataframes_list):
                 startrow = 0
-                for idx2, df in enumerate(dataframes):
+                for df in dataframes:
                     df.to_excel(
                         writer,
                         sheet_name=f"Sheet{idx+1}",
@@ -338,10 +374,9 @@ def write_dataframes_to_excel(dataframes_list, filename):
         pass
 
 
-def extract_tables_from_html(html_file):
+def extract_tables_from_html(html_file: str) -> List[pd.DataFrame]:
     """
-    input: html_file
-    output: [df1,df2,df3,..]
+    Extract tables/ data-in-table-tag from HTML. and return as pandas dataframe.
     """
     # Initialize an empty list to store the dataframes
     dataframes = []
