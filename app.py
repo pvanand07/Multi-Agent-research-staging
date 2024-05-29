@@ -5,20 +5,6 @@ from streamlit_toggle import st_toggle_switch
 st.set_page_config(layout="wide")
 
 import os
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv("keys.env")
-
-# Retrieve environment variables
-
-TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
-BRAVE_API_KEY = os.getenv("BRAVE_API_KEY")
-SUPABASE_USER = os.getenv("SUPABASE_USER")
-SUPABASE_PASSWORD = os.getenv("SUPABASE_PASSWORD")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-HELICON_API_KEY = os.getenv("HELICON_API_KEY")
-
 
 ####------------------------------ OPTIONAL--> User id and persistant data storage-------------------------------------####
 import uuid
@@ -41,12 +27,9 @@ from src.helper_functions import (
     write_dataframes_to_excel,
     generate_report_with_reference,
     json_from_text,
-    fetch_and_extract_content,
-    search_brave,
-    insert_data,
-    limit_tokens,
 )
-from typing import Dict, List, Any
+
+from src.inference import generate_topics, generate_missing_topics, generate_report
 
 ####--------------------CONSTANTS------------------------------##
 
@@ -75,79 +58,6 @@ sys_prompts = {
 }
 
 
-def generate_topics(user_input: str) -> Dict[str, Any]:
-    """
-    Create a dictionary of the part (part is the component of main user query) and its subtopics.
-    """
-
-    prompt_topics = f"""CREATE A LIST OF 5-10 CONCISE SUBTOPICS TO FOLLOW FOR COMPLETING ###{user_input}###, RETURN A VALID PYTHON LIST"""
-    prompt_keywords = f"""EXTRACT KEYWORDS(NOUN) FROM USER INPUT ###{user_input}###, RETURN A VALID PYTHON LIST"""
-
-    response_topics = together_response(
-        prompt_topics, model=llm_default_small, SysPrompt=SysPromptList
-    )
-    topics = json_from_text(text=response_topics)
-
-    user_query_keywords = json_from_text(
-        together_response(
-            message=prompt_keywords, model=llm_default_small, SysPrompt=SysPromptList
-        )
-    )
-    st.session_state.user_query_keywords = user_query_keywords
-
-    st.markdown(user_query_keywords)
-    st.markdown(topics)
-
-    prompt_subtopics = (
-        f"""List 2-5  subtopics for each topic in the list of '{topics}' covering all aspects to generate a report, within the context of ###{user_query_keywords}###. to achieve each subtopic add a detailed instruction"""
-        + """ Respond in the following format: 
-        {
-            "Topic 1": [
-                ["Subtopic","Instuction"]
-            ],
-            "Topic 2": [
-                ["Subtopic","Instuction"]
-            ]
-        }, RETURN A VALID JSON FILE"""
-    )
-
-    response_subtopics = together_response(
-        prompt_subtopics,
-        model=llm_default_medium,
-        SysPrompt=SysPromptJson,
-        frequency_penalty=0.65,
-    )
-    subtopics = json_from_text(response_subtopics)
-
-    return subtopics
-
-
-def generate_missing_topics(user_input: str) -> Dict[str, Any]:
-    """
-    Create a dictionary similar to the `generate_topics` function, but for missing parts.
-    """
-
-    topics = user_input
-    user_query_keywords = st.session_state.user_query_keywords
-
-    prompt_subtopics = (
-        f"""List 2-5  Subtopics for the given Topic : ###{topics}### covering all aspects to generate a report, within the context of these keywords : ###{user_query_keywords}###, also to achieve each subtopic add a detailed Instruction that will be used as a LLM promt, hence keep it contextual."""
-        + """ Respond in the following format: 
-        {
-            "Topic 1": [
-                ["Subtopic","Instuction"]
-            ],
-        }, RETURN A VALID JSON FILE"""
-    )
-
-    response_subtopics = together_response(
-        prompt_subtopics, model=llm_default_medium, SysPrompt=SysPromptJson
-    )
-    subtopics = json_from_text(response_subtopics)
-
-    return subtopics
-
-
 def topics_interface():
     st.title("🧑‍🔬 Researcher Pro")
 
@@ -169,6 +79,8 @@ def topics_interface():
         st.session_state.report_format = "Default"
     if "data_format" not in st.session_state:
         st.session_state.data_format = "Default"
+    if "html_report_content" not in st.session_state:
+        st.session_state.html_report_content = []
 
     with col1:
 
@@ -196,13 +108,30 @@ def topics_interface():
 
         st.button(label="Generate subtopics", on_click=clicked)
         if st.button("Quick Report"):
-            generate_report(st.session_state["user_query_full"])
+            quick_report, refrences = generate_report(
+                internet_search=st.session_state.internet_toggle,
+                query=st.session_state.user_query_full,
+                data_format=st.session_state.data_format,
+                report_format=st.session_state.report_format,
+                user_query_keywords=st.session_state.user_query_keywords,
+                user_id=st.session_state.user_id,
+                user_query_full=st.session_state.user_query_full,
+            )
+            for item in refrences:
+                with st.expander(f"Fetched relevant data from url: {item[1]}"):
+                    st.markdown(item[0], unsafe_allow_html=True, help=None)
+
+            st.success(f"Report Generated", icon="✅")
+            with st.expander(f"# Report : {st.session_state.user_query_full}"):
+                st.markdown(quick_report, unsafe_allow_html=True, help=None)
 
         if st.session_state.submit_query == True:
             # st.session_state.submit_query = False
             if st.session_state.generated == False:
                 with st.spinner(text="Please wait..."):
-                    st.session_state.data = generate_topics(user_input)
+                    st.session_state.data, st.session_state.user_query_keywords = (
+                        generate_topics(user_input)
+                    )
                     st.session_state.generated = True
             else:
                 data = st.session_state.data
@@ -227,7 +156,7 @@ def topics_interface():
                 }
                 nodes.append(final_node)
 
-            return_select = tree_select(
+            st.session_state.return_select = tree_select(
                 nodes,
                 check_model="leaf",
                 only_leaf_checkboxes=True,
@@ -237,19 +166,46 @@ def topics_interface():
                 label="🧑‍🎓 : Missing some topics? Add it here..."
             )
             if st.button("Add"):
-                topics = generate_missing_topics(user_input=missing_topics)
+                topics = generate_missing_topics(
+                    user_input=missing_topics,
+                    user_query_keywords=st.session_state.user_query_keywords,
+                )
                 st.session_state.data.update(topics)
 
     with col2:
         st.subheader("Report elements")
         if st.session_state.submit_query == True:
-            st.write("\n* ".join(return_select["checked"]))
-            st.session_state.return_select = return_select
+            st.write("* " + "\n* ".join(st.session_state.return_select["checked"]))
 
     if "return_select" in st.session_state:
         if st.button("Generate Report"):
             for query in st.session_state.return_select["checked"]:
-                generate_report(query)
+
+                st.write(f"Creating report for {query}")
+                md_report, all_text_with_urls = generate_report(
+                    internet_search=st.session_state.internet_toggle,
+                    query=query,
+                    data_format=st.session_state.data_format,
+                    report_format=st.session_state.report_format,
+                    user_query_keywords=st.session_state.user_query_keywords,
+                    user_id=st.session_state.user_id,
+                    user_query_full=st.session_state.user_query_full,
+                )
+                full_data = {
+                    "user_id": st.session_state.user_id,
+                    "query": query,
+                    "text_with_urls": str(all_text_with_urls),
+                    "md_report": md_report,
+                }
+                for item in all_text_with_urls:
+                    with st.expander(f"Fetched relevant data from url: {item[1]}"):
+                        st.markdown(item[0], unsafe_allow_html=True, help=None)
+
+                st.success(f"Report Generated", icon="✅")
+                with st.expander(f"# Report : {query}"):
+                    st.markdown(md_report, unsafe_allow_html=True, help=None)
+                st.session_state.html_report_content.append(md_report)
+                st.session_state.full_data.append(full_data)
 
     if st.session_state.get("html_report_content", False):
         with st.container():
@@ -273,7 +229,6 @@ def topics_interface():
         excel_path = f"{directory}/" + file_name + ".xlsx"
 
         # pd.DataFrame(st.session_state.full_data).to_excel(excel_path, index=False)
-
         html_report = generate_report_with_reference(st.session_state.full_data)
         with st.container():
             st.download_button(
@@ -295,67 +250,6 @@ def topics_interface():
                 st.download_button(
                     "Download Combined Excel Report", f, file_name=file_name + ".xlsx"
                 )
-
-
-def generate_report(query: str) -> None:
-
-    st.write(f"Creating report for {query}")
-    if "html_report_content" not in st.session_state:
-        st.session_state.html_report_content = []
-
-    st.write(f"Internet is {str(st.session_state.internet_toggle)}")
-    if st.session_state.internet_toggle:
-        search_query = query + str(st.session_state.user_query_keywords)
-
-        # Search for relevant URLs
-        urls = search_brave(search_query, num_results=6)
-
-        # Fetch and extract content from the URLs
-        all_text_with_urls = fetch_and_extract_content(
-            data_format=st.session_state.data_format,
-            urls=urls,
-            query=query,
-            num_refrences=4,
-        )
-
-        # Display content of the urls in the application
-        for item in all_text_with_urls:
-            with st.expander(f"Fetched relevant data from url: {item[1]}"):
-                st.markdown(item[0], unsafe_allow_html=True, help=None)
-
-        prompt = f"#### ADDITIONAL CONTEXT:{limit_tokens(str(all_text_with_urls))} #### perform user query:{query} #### IN THE CONTEXT OF: {str(st.session_state.user_query_keywords)}"
-        SysPrompt = sys_prompts["SysPromptOnline"][st.session_state.report_format]
-
-    else:
-        prompt = f"perform user query:{query}"
-        SysPrompt = sys_prompts["SysPromptOffline"][st.session_state.report_format]
-        all_text_with_urls = "[]"
-
-    md_report = together_response(
-        prompt, model=llm_default_medium, SysPrompt=SysPrompt, frequency_penalty=0.5
-    )
-    st.session_state.html_report_content.append(md_report)
-    # Generate HTML report
-    insert_data(
-        st.session_state["user_id"],
-        st.session_state["user_query_full"],
-        query,
-        str(all_text_with_urls),
-        md_report,
-    )
-
-    st.success(f"Report Generated!")
-    with st.expander(f"# Report : {query}"):
-        st.markdown(md_report, unsafe_allow_html=True, help=None)
-
-    st.session_state.full_data.append(
-        {
-            "user_id": st.session_state["user_id"],
-            "query": query,
-            "text_with_urls": str(all_text_with_urls),
-            "md_report": md_report,
-        }
-    )
 
 
 def report_interface(report, idx):
