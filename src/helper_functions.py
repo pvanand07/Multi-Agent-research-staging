@@ -67,28 +67,20 @@ from nltk.tokenize import word_tokenize
 from brave import Brave
 from fuzzy_json import loads
 from half_json.core import JSONFixer
-from openai import OpenAI
+from openai import NoneType, OpenAI
+import os
 from typing import Dict, List, Any, Tuple
 from dotenv import load_dotenv
 
 load_dotenv("keys.env")
 
 # Retrieve environment variables
-"""
 TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
 BRAVE_API_KEY = os.getenv("BRAVE_API_KEY")
 SUPABASE_USER = os.getenv("SUPABASE_USER")
 SUPABASE_PASSWORD = os.getenv("SUPABASE_PASSWORD")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 HELICON_API_KEY = os.getenv("HELICON_API_KEY")
-"""
-TOGETHER_API_KEY = "85e577a7bd21434e2d3f1ab2bd7a2750c6db5eb7ddf09cce131655911c93f622"
-BRAVE_API_KEY = "BSACEJBwqqDWNP0CyJDu0ZwqpxNPobG"
-SUPABASE_USER = "postgres.ftqmmutydpjseodidugl"
-SUPABASE_PASSWORD = "aVbx0PGvcRcTcg3K"
-GROQ_API_KEY = "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"
-HELICON_API_KEY = "sk-5unfe2a-eibeuoy-sqx265y-k7s5m3i"
-
 
 llm_default_small = "meta-llama/Llama-3-8b-chat-hf"
 llm_default_medium = "meta-llama/Llama-3-70b-chat-hf"
