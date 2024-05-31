@@ -1,14 +1,6 @@
-import streamlit as st
-
-####------------------------------ OPTIONAL--> User id and persistant data storage-------------------------------------####
-import uuid
-from datetime import datetime
 import psycopg2
-
-
-# Create new user_id if not in current streamlit memmory
-if "user_id" not in st.session_state:
-    st.session_state["user_id"] = str(uuid.uuid4())
+import streamlit as st
+from datetime import datetime
 
 
 def insert_data(
@@ -45,8 +37,6 @@ def insert_data(
     conn.close()
 
 
-####-----------------------------------------------------END----------------------------------------------------------####
-
 import mistune
 from mistune.plugins.table import table
 from jinja2 import Template
@@ -67,13 +57,13 @@ from nltk.tokenize import word_tokenize
 from brave import Brave
 from fuzzy_json import loads
 from half_json.core import JSONFixer
-from openai import NoneType, OpenAI
+from openai import OpenAI
 import os
 from typing import Dict, List, Any, Tuple
 from dotenv import load_dotenv
 
 load_dotenv("keys.env")
-
+"""
 # Retrieve environment variables
 TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
 BRAVE_API_KEY = os.getenv("BRAVE_API_KEY")
@@ -81,6 +71,14 @@ SUPABASE_USER = os.getenv("SUPABASE_USER")
 SUPABASE_PASSWORD = os.getenv("SUPABASE_PASSWORD")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 HELICON_API_KEY = os.getenv("HELICON_API_KEY")
+"""
+TOGETHER_API_KEY = "85e577a7bd21434e2d3f1ab2bd7a2750c6db5eb7ddf09cce131655911c93f622"
+BRAVE_API_KEY = "BSACEJBwqqDWNP0CyJDu0ZwqpxNPobG"
+SUPABASE_USER = "postgres.ftqmmutydpjseodidugl"
+SUPABASE_PASSWORD = "aVbx0PGvcRcTcg3K"
+GROQ_API_KEY = "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"
+HELICON_API_KEY = "sk-5unfe2a-eibeuoy-sqx265y-k7s5m3i"
+
 
 llm_default_small = "meta-llama/Llama-3-8b-chat-hf"
 llm_default_medium = "meta-llama/Llama-3-70b-chat-hf"
@@ -287,7 +285,9 @@ def md_to_html(md_text: str) -> str:
     return html_content
 
 
-def generate_report_with_reference(full_data: List[Dict[str, Any]]) -> str:
+def generate_report_with_reference(
+    full_data: List[Dict[str, Any]]
+) -> Tuple[str, List[Any]]:
     """
     Generate HTML report with references and saves pdf report to "generated_pdf_report.pdf"
     """
@@ -298,10 +298,11 @@ def generate_report_with_reference(full_data: List[Dict[str, Any]]) -> str:
     # Loop through each row in your dataset
     html_report = ""
     idx = 1
+    df_tables_list = []
     for subtopic_data in full_data:
 
         md_report = md_to_html(subtopic_data["md_report"])
-        st.session_state.df_tables_list.append(extract_tables_from_html(md_report))
+        df_tables_list.append(extract_tables_from_html(md_report))
 
         # Convert the string representation of a list of tuples back to a list of tuples
         references = ast.literal_eval(subtopic_data["text_with_urls"])
@@ -346,7 +347,7 @@ def generate_report_with_reference(full_data: List[Dict[str, Any]]) -> str:
         idx += 1
 
     pdf.output("generated_pdf_report.pdf")
-    return html_report
+    return html_report, df_tables_list
 
 
 def write_dataframes_to_excel(

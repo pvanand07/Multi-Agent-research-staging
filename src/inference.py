@@ -138,7 +138,7 @@ def generate_report(
         all_text_with_urls = "[]"
 
     md_report = together_response(
-        prompt, model=llm_default_medium, SysPrompt=SysPrompt, frequency_penalty=0.09
+        prompt, model=llm_default_medium, SysPrompt=SysPrompt, frequency_penalty=0.01
     )
     insert_data(
         user_id=user_id,
@@ -149,3 +149,18 @@ def generate_report(
     )
 
     return md_report, all_text_with_urls
+
+
+def generate_followup_questions(user_query_full: str | None) -> List[str]:
+
+    if user_query_full != None:
+        prompt = f"""create a list of 6 questions that a user might ask following the question: {user_query_full}:"""
+    else:
+        prompt = """create a list of mixed 6 questions to create a report or plan or course on any of the topics product,market,research topic """
+
+    response_topics = json_from_text(
+        together_response(
+            prompt, model=llm_default_small, SysPrompt=SysPromptList, temperature=1
+        )
+    )
+    return response_topics

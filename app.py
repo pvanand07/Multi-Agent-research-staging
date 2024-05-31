@@ -23,45 +23,22 @@ nltk.download("stopwords")
 nltk.download("punkt")
 
 from src.helper_functions import (
-    together_response,
     write_dataframes_to_excel,
     generate_report_with_reference,
-    json_from_text,
 )
 
-from src.inference import generate_topics, generate_missing_topics, generate_report
-
-####--------------------CONSTANTS------------------------------##
-
-SysPromptJson = "You are now in the role of an expert AI who can extract structured information from user request. Both key and value pairs must be in double quotes. You must respond ONLY with a valid JSON file. Do not add any additional comments."
-SysPromptList = "You are now in the role of an expert AI who can extract structured information from user request. All elements must be in double quotes. You must respond ONLY with a valid python List. Do not add any additional comments."
-SysPromptDefault = (
-    "You are an expert AI, complete the given task. Do not add any additional comments."
+from src.inference import (
+    generate_topics,
+    generate_missing_topics,
+    generate_report,
+    generate_followup_questions,
 )
-
-llm_default_small = "meta-llama/Llama-3-8b-chat-hf"
-llm_default_medium = "meta-llama/Llama-3-70b-chat-hf"
-
-sys_prompts = {
-    "SysPromptOffline": {
-        "Default": "You are an expert AI, complete the given task. Do not add any additional comments.",
-        "Full Text Report": "You are an expert AI who can create a detailed report from user request. The report should be in markdown format. Do not add any additional comments.",
-        "Tabular Report": "You are an expert AI who can create a structured report from user request.The report should be in markdown format structured into subtopics/tables/lists. Do not add any additional comments.",
-        "Tables only": "You are an expert AI who can create a structured tabular report from user request.The report should be in markdown format consists of only markdown tables. Do not add any additional comments.",
-    },
-    "SysPromptOnline": {
-        "Default": "You are an expert AI, complete the given task using the provided context. Do not add any additional comments.",
-        "Full Text Report": "You are an expert AI who can create a detailed report using information provided in the context from user request. The report should be in markdown format. Do not add any additional comments.",
-        "Tabular Report": "You are an expert AI who can create a structured report using information provided in the context from user request. The report should be in markdown format structured into subtopics/tables/lists. Do not add any additional comments.",
-        "Tables only": "You are an expert AI who can create a structured tabular report using information provided in the context from user request. The report should be in markdown format consists of only markdown tables. Do not add any additional comments.",
-    },
-}
 
 
 def topics_interface():
     st.title("🧑‍🔬 Researcher Pro")
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     if "submit_query" not in st.session_state:
         st.session_state.submit_query = False
@@ -177,6 +154,13 @@ def topics_interface():
         if st.session_state.submit_query == True:
             st.write("* " + "\n* ".join(st.session_state.return_select["checked"]))
 
+    response_topics = followup_questions()
+    if len(response_topics) > 0:
+        with col3:
+            st.subheader("Similar queries...")
+            for topic in response_topics:
+                st.button(topic, on_click=recommendation_button, args=(topic,))
+
     if "return_select" in st.session_state:
         if st.button("Generate Report"):
             for query in st.session_state.return_select["checked"]:
@@ -229,7 +213,9 @@ def topics_interface():
         excel_path = f"{directory}/" + file_name + ".xlsx"
 
         # pd.DataFrame(st.session_state.full_data).to_excel(excel_path, index=False)
-        html_report = generate_report_with_reference(st.session_state.full_data)
+        html_report, df_tables_list = generate_report_with_reference(
+            st.session_state.full_data
+        )
         with st.container():
             st.download_button(
                 "Download Combined HTML Report",
@@ -240,10 +226,12 @@ def topics_interface():
 
         with open("generated_pdf_report.pdf", "rb") as f:
             st.download_button(
-                "Download Combined Pdf Report", f, file_name=file_name + ".pdf"
+                "Download Combined Pdf Report",
+                f,
+                file_name=(f"{directory}/" + file_name + ".pdf"),
             )
 
-        write_dataframes_to_excel(st.session_state.df_tables_list, excel_path)
+        write_dataframes_to_excel(df_tables_list, excel_path)
 
         if os.path.exists(excel_path):
             with open(excel_path, "rb") as f:
@@ -269,26 +257,21 @@ def followup_questions():
     if "recommendation_query" not in st.session_state:
         st.session_state.recommendation_query = None
     if "recommendation_topics" not in st.session_state:
-        st.session_state.recommendation_topics = None
+        st.session_state.recommendation_topics = []
 
     if st.session_state["user_query_full"]:
-        prompt = f"""create a list of 6 questions that a user might ask following the question: {st.session_state['user_query_full']}:"""
-    else:
-        prompt = """create a list of mixed 6 questions to create a report or plan or course on any of the topics product,market,research topic """
-
-    if st.session_state.user_query_full != st.session_state.recommendation_query:
-        response_topics = json_from_text(
-            together_response(
-                prompt, model=llm_default_small, SysPrompt=SysPromptList, temperature=1
+        if st.session_state.user_query_full != st.session_state.recommendation_query:
+            response_topics = generate_followup_questions(
+                st.session_state.user_query_full
             )
-        )
-        st.session_state.recommendation_topics = response_topics
-        st.session_state.recommendation_query = st.session_state.user_query_full
+            st.session_state.recommendation_topics = response_topics
+            st.session_state.recommendation_query = st.session_state.user_query_full
+        else:
+            response_topics = st.session_state.recommendation_topics
     else:
-        response_topics = st.session_state.recommendation_topics
+        response_topics = []
 
-    for topic in response_topics:
-        st.button(topic, on_click=recommendation_button, args=(topic,))
+    return response_topics
 
 
 def advanced_options():
@@ -316,11 +299,6 @@ def advanced_options():
                     ],
                 )
             )
-            st.write(sys_prompts["SysPromptOnline"][st.session_state.report_format])
-            st.write(st.session_state.data_format)
-
-        else:
-            st.write(sys_prompts["SysPromptOffline"][st.session_state.report_format])
 
 
 def clear_cache():
